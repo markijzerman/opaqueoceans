@@ -23,13 +23,18 @@ while pjOK == False:
 
 # If on battery power, shut down after 3min
 data = stat['data']
-if data['powerInput'] == "NOT_PRESENT" and data['powerInput5vIo'] == 'NOT_PRESENT':
+if data['powerInput'] == "NOT_PRESENT" or "BAD" and data['powerInput5vIo'] == 'NOT_PRESENT' or "BAD":
+
+    print('turning off in 10m, on battery')
+
+    # print data for checking
+    print(stat['data'])
 
 	# Write statement to log
-    logging.info('Raspberry Pi on battery power. Turning off in 3min')
+    logging.info('Raspberry Pi on battery power. Turning off in 10min')
 
    # Keep Raspberry Pi running
-    sleep(180)
+    sleep(600)
 
    # Make sure wakeup_enabled and wakeup_on_charge have the correct values
     pj.rtcAlarm.SetWakeupEnabled(True)
@@ -44,6 +49,9 @@ if data['powerInput'] == "NOT_PRESENT" and data['powerInput5vIo'] == 'NOT_PRESEN
     os.system("sudo shutdown -h now")
 
 else:
+    # print data for checking
+    print(stat['data'])
+    print('staying on, mains power')
 
 	# Write statement to log
     logging.info('Raspberry Pi on mains power, not turned off automatically')
