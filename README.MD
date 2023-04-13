@@ -12,7 +12,9 @@ Dolist:
     - meer info: https://www.youtube.com/watch?v=SRDBQTyQ8Ag&ab_channel=CoreElectronics
     - check https://raspberrypi-guide.github.io/other/boot-automation-pijuice
     - for the systemd to work, please make sure the service waits for the camera like so: https://unix.stackexchange.com/questions/186899/how-to-wait-for-a-dev-video0-before-starting-a-service
-    
+    - dataplicity installed for remote access
 
-- install dataplicity for remote access
+
+TODO:
+- figure out connection over usb
 
