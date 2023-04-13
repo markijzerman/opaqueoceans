@@ -35,9 +35,9 @@ if data['powerInput'] == "NOT_PRESENT" or "BAD" and data['powerInput5vIo'] == 'N
     print(stat['data'])
 
 	# Write statement to log
-    logging.info('Raspberry Pi on battery power. Turning off in 10min - taking picture')
+    logging.info('Hello! Raspberry Pi on battery power. Turning off in 10min - taking picture')
 
-    os.system("/usr/bin/libcamera-still -o /home/opaque/opaqueoceans/image" + str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S')) + ".jpg")
+    os.system("/usr/bin/libcamera-still -o /home/opaque/opaqueoceans/images/image" + str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S')) + ".jpg")
 
    # Keep Raspberry Pi running - THING TO DO WOULD BE HERE, WOULD TURN OFF AFTER THIS!
     sleep(600)
@@ -50,6 +50,8 @@ if data['powerInput'] == "NOT_PRESENT" or "BAD" and data['powerInput5vIo'] == 'N
    # the battery
     pj.power.SetSystemPowerSwitch(0)
     pj.power.SetPowerOff(30)
+
+    logging.info('Bye! shutting down now as minutes have elapsed')
 
    # Now turn off the system
     os.system("sudo shutdown -h now")
