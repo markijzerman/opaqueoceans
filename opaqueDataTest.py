@@ -5,6 +5,10 @@ import logging
 from time import sleep
 from pijuice import PiJuice
 
+# for picture date getting
+from datetime import datetime
+
+
 logging.basicConfig(
 	filename = '/home/opaque/opaqueoceans/pistatus.log',
 	level = logging.DEBUG,
@@ -31,9 +35,11 @@ if data['powerInput'] == "NOT_PRESENT" or "BAD" and data['powerInput5vIo'] == 'N
     print(stat['data'])
 
 	# Write statement to log
-    logging.info('Raspberry Pi on battery power. Turning off in 10min')
+    logging.info('Raspberry Pi on battery power. Turning off in 10min - taking picture')
 
-   # Keep Raspberry Pi running
+    os.system("/usr/bin/libcamera-still -o /home/opaque/opaqueoceans/image" + str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S')) + ".jpg")
+
+   # Keep Raspberry Pi running - THING TO DO WOULD BE HERE, WOULD TURN OFF AFTER THIS!
     sleep(600)
 
    # Make sure wakeup_enabled and wakeup_on_charge have the correct values
