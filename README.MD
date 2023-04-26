@@ -13,6 +13,10 @@ Dolist:
     - check https://raspberrypi-guide.github.io/other/boot-automation-pijuice
     - for the systemd to work, please make sure the service waits for the camera like so: https://unix.stackexchange.com/questions/186899/how-to-wait-for-a-dev-video0-before-starting-a-service
     - dataplicity installed for remote access
+    - set up for use over usb for easy data access in the field! https://www.mickmake.com/post/headless-pi-zero-w-2-easy-ways-of-connecting-tutorial/
+    - using libcamera-still for making pictures
+    - use dropbox_uploader.sh to upload pictures to dropbox if internet is available.
+    - added dtoverlay=i2c-rtc,ds1307 to config.txt as explained in  https://github.com/PiSupply/PiJuice/issues/472#issuecomment-594000025
 
 
 TODO:
