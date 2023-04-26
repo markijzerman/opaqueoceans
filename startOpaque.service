@@ -1,0 +1,12 @@
+[Unit]
+Description=Opaque Oceans start
+BindsTo=dev-video0.device
+After=dev-video0.device
+
+[Service]
+ExecStart=/usr/bin/python /home/opaque/opaqueoceans/opaqueDataTest.py
+Restart=on-failure
+User=opaque
+
+[Install]
+WantedBy=multi-user.target
