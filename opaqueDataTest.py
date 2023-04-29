@@ -95,4 +95,3 @@ if checkForUser() == False:
     os.system("sudo shutdown -h now")
 
 atexit.register(exit_handler)
-sleep(60)

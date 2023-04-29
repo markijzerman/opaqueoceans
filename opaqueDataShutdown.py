@@ -17,6 +17,7 @@ pj.rtcAlarm.SetWakeupEnabled(True)
 
 # The Raspberry Pi should wake up even when there is no battery, i.e. a
 # battery percentage of 0
+# DISABLED FOR NOW TO MAKE SURE THIS IS NOT THE REASON FOR IT FAILING
 pj.power.SetWakeUpOnCharge(0)
 
 # Write statement to log
