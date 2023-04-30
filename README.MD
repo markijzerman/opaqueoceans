@@ -17,6 +17,8 @@ Dolist:
     - using libcamera-still for making pictures
     - use dropbox_uploader.sh to upload pictures to dropbox if internet is available.
     - added dtoverlay=i2c-rtc,ds1307 to config.txt as explained in  https://github.com/PiSupply/PiJuice/issues/472#issuecomment-594000025
+    - helpful voor python pijuice operatie: https://github.com/PiSupply/PiJuice/blob/master/Software/README.md
+    - set EEPROM address to 52 as in https://github.com/PiSupply/PiJuice/issues/689
 
 
 TODO:

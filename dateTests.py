@@ -11,3 +11,5 @@ getAlarm = pj.rtcAlarm.GetAlarm()
 print(getControlStatus)
 print(getTime)
 print(getAlarm)
+
+print(pj.power.GetWakeUpOnCharge())

@@ -37,8 +37,9 @@ def checkForUser():
 # called when program exits
 def exit_handler():
     # Make sure wakeup_enabled and wakeup_on_charge have the correct values
+    pj.rtcAlarm.SetAlarm({'minute_period': 60})
     pj.rtcAlarm.SetWakeupEnabled(True)
-    pj.power.SetWakeUpOnCharge(0)
+    #pj.power.SetWakeUpOnCharge(0)
 
 logging.basicConfig(
 	filename = '/home/opaque/opaqueoceans/pistatus.log',
@@ -82,7 +83,7 @@ if checkForUser() == False:
     
     # Make sure wakeup_enabled and wakeup_on_charge have the correct values
     pj.rtcAlarm.SetWakeupEnabled(True)
-    pj.power.SetWakeUpOnCharge(0)
+   #pj.power.SetWakeUpOnCharge(0)
 
     # Make sure power to the Raspberry Pi is stopped to not deplete
     # the battery
@@ -91,7 +92,7 @@ if checkForUser() == False:
 
     logging.info('Bye! shutting down now as time has elapsed')
 
-    # Now turn off the system
-    os.system("sudo shutdown -h now")
+    # Now turn off the system after 1 min
+    os.system("sudo shutdown -P +1")
 
 atexit.register(exit_handler)

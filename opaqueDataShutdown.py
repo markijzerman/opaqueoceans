@@ -19,6 +19,7 @@ pj.rtcAlarm.SetWakeupEnabled(True)
 # battery percentage of 0
 # DISABLED FOR NOW TO MAKE SURE THIS IS NOT THE REASON FOR IT FAILING
 pj.power.SetWakeUpOnCharge(0)
+pj.rtcAlarm.SetAlarm({'minute_period': 60})
 
 # Write statement to log
 logging.info('Raspberry Pi battery running low - shutting down')
@@ -27,4 +28,4 @@ logging.info('Raspberry Pi battery running low - shutting down')
 pj.status.SetLedBlink('D2', 10, [200,0,0], 50, [0, 0, 0], 50)
 
 # Now shut down
-os.system("sudo shutdown -h now")
+os.system("sudo shutdown -P +1")
