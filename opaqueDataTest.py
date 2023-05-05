@@ -40,6 +40,7 @@ def exit_handler():
     pj.rtcAlarm.SetAlarm({'minute_period': 60})
     pj.rtcAlarm.SetWakeupEnabled(True)
     #pj.power.SetWakeUpOnCharge(0)
+    logging.shutdown()
 
 logging.basicConfig(
 	filename = '/home/opaque/opaqueoceans/pistatus.log',
@@ -93,6 +94,7 @@ if checkForUser() == False:
     logging.info('Bye! shutting down now as time has elapsed')
 
     # Now turn off the system after 1 min
+    
     os.system("sudo shutdown -P +1")
 
 atexit.register(exit_handler)
