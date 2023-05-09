@@ -6,6 +6,8 @@ import logging
 from time import sleep
 from pijuice import PiJuice
 
+import glob
+
 # VALUES
 time = 20
 
@@ -42,67 +44,142 @@ def exit_handler():
     #pj.power.SetWakeUpOnCharge(0)
     logging.shutdown()
 
-logging.basicConfig(
-	filename = '/home/opaque/opaqueoceans/pistatus.log',
-	level = logging.DEBUG,
-	format = '%(asctime)s %(message)s',
-	datefmt = '%d/%m/%Y %H:%M:%S')
+def set_last_uploaded(upload_tracker: str, last_file: str):
+    with open(upload_tracker, "w") as f:
+        f.write(last_file)
 
-pj = PiJuice(1,0x14)
+# get last uploaded file
+def get_last_uploaded(upload_tracker: str) -> float:
+    with open(upload_tracker, "r") as f:
+        return os.path.getmtime(f.readline())
 
-pjOK = False
-while pjOK == False:
-   stat = pj.status.GetStatus()
-   if stat['error'] == 'NO_ERROR':
-      pjOK = True
-   else:
-      sleep(0.1)
+# get list of files to be uploaded
+def get_files_to_upload(images_folder: str) -> list:
+    files = list(filter(os.path.isfile, glob.glob(f"{images_folder}/*.jpg")))
+    files.sort(key=os.path.getmtime)
+    return list(filter(lambda x: os.path.getmtime(x) > last_uploaded_time, files))
 
-
-
-# print data for checking
-print(stat['data'])
-
-get_charge = pj.status.GetChargeLevel()
-charge_str = ""
-
-if get_charge['error'] == "NO_ERROR":
-    charge_str = f"Charge level: {get_charge['data']}%"
-else:
-    charge_str = f"Error getting battery charge level: {get_charge['error']}"
-
-# Write statement to log
-logging.info(f'Hello! Raspberry Pi on battery power. {charge_str}. Taking picture!')
-
-curDate = str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-os.system("/usr/bin/libcamera-still -o /home/opaque/opaqueoceans/images/image" + curDate + ".jpg")
-
-# if internet, upload image
-# !! CHANGE THIS TO UPLOAD ANY THAT HAVE NOT BEEN UPLOADED !!
-if connect() == True:
-    print('Internet is connected! Uploading image!')
-    os.system("/home/opaque/opaqueoceans/dropbox_uploader.sh upload /home/opaque/opaqueoceans/images/image" + curDate + ".jpg /")
-else:
-    print('no internet, uploading later')
-
-# check if there is a user logged on, if so stay on, if not, turn off
-# Keep Raspberry Pi running - THING TO DO WOULD BE HERE, WOULD TURN OFF AFTER THIS!
-if checkForUser() == False:
-    sleep(time)
+# Function that checks if the rtc was reset (so lost power)
+def is_rtc_time_sane(pj: PiJuice) -> bool:
+    d = pj.rtcAlarm.GetTime()
+    if int(d['data']['year']) < 2023:
+        return False
     
-    # Make sure wakeup_enabled and wakeup_on_charge have the correct values
-    pj.rtcAlarm.SetWakeupEnabled(True)
-   #pj.power.SetWakeUpOnCharge(0)
+    return True
 
-    # Make sure power to the Raspberry Pi is stopped to not deplete
-    # the battery
-    pj.power.SetSystemPowerSwitch(0)
-    pj.power.SetPowerOff(30)
+# Function that checks rtc reset and syncs time from ntp server
+# Can be used to automatically rectify picture names after power loss
+def check_and_sync_rtc(pj: PiJuice) -> bool:
+    if not is_rtc_time_sane(pj):
 
-    logging.info('Bye! shutting down now as time has elapsed')
+        # enable time server sync
+        os.system("sudo systemctl enable --now systemd-timesyncd")
 
-    # Now turn off the system after 1 min
+        sync_success = False
+        for i in range(10):
+            res = subprocess.check_output(["timedatectl", "status"])
+            if b'System clock synchronized: yes' in res:
+                sync_success = True
+        
+        # disable time server sync
+        os.system("sudo systemctl disable --now systemd-timesyncd")
+
+        return sync_success
     
-    os.system("sudo shutdown -P +1")
+    return False
+        
 
-atexit.register(exit_handler)
+if __name__ == "__main__":
+    logging.basicConfig(
+        filename = '/home/opaque/opaqueoceans/pistatus.log',
+        level = logging.DEBUG,
+        format = '%(asctime)s %(message)s',
+        datefmt = '%d/%m/%Y %H:%M:%S')
+
+    pj = PiJuice(1,0x14)
+
+    pjOK = False
+    while pjOK == False:
+        stat = pj.status.GetStatus()
+        if stat['error'] == 'NO_ERROR':
+            pjOK = True
+        else:
+            sleep(0.1)
+
+
+
+    # print data for checking
+    print(stat['data'])
+
+    get_charge = pj.status.GetChargeLevel()
+    charge_str = ""
+
+    if get_charge['error'] == "NO_ERROR":
+        charge_str = f"Charge level: {get_charge['data']}%"
+    else:
+        charge_str = f"Error getting battery charge level: {get_charge['error']}"
+
+    # Write statement to log
+    logging.info(f'Hello! Raspberry Pi on battery power. {charge_str}. Taking picture!')
+
+    img_folder = "/home/opaque/opaqueoceans/images"
+
+    curDate = str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
+    new_file_name = f"{img_folder}/image{curDate}.jpg"
+
+    os.system(f"/usr/bin/libcamera-still -o {new_file_name}")
+
+    upload_tracker = f"{img_folder}/last_uploaded"
+
+    # if internet, upload image
+    if connect() == True:
+        last_uploaded_time = get_last_uploaded(upload_tracker)
+
+        files = get_files_to_upload(img_folder)
+        files_to_upload_str = ", ".join(files)
+
+        print(f"Internet is connected! Files to be uploaded: {files_to_upload_str}.")
+
+        # also log upload
+        logging.info(f"Uploading files: {files_to_upload_str}.")
+        last_file = ""
+        for file in files:
+            ret = os.system(f"/home/opaque/opaqueoceans/dropbox_uploader.sh upload {file} /")
+            
+            # high byte is os.system process return code (see https://docs.python.org/3/library/os.html#os.wait)
+            exit_sig = (ret >> 8)
+
+            # upload returned without error
+            if exit_sig == 0:
+                last_file = file
+            else:
+                logging.info("Uploading to dropbox failed. Retry next time internet connection is found.")
+                break
+
+        set_last_uploaded(upload_tracker, last_file)
+
+    else:
+        print('no internet, uploading later')
+
+    # check if there is a user logged on, if so stay on, if not, turn off
+    # Keep Raspberry Pi running - THING TO DO WOULD BE HERE, WOULD TURN OFF AFTER THIS!
+    if checkForUser() == False:
+        sleep(time)
+        
+        # Make sure wakeup_enabled and wakeup_on_charge have the correct values
+        pj.rtcAlarm.SetWakeupEnabled(True)
+    #pj.power.SetWakeUpOnCharge(0)
+
+        # Make sure power to the Raspberry Pi is stopped to not deplete
+        # the battery
+        pj.power.SetSystemPowerSwitch(0)
+        pj.power.SetPowerOff(30)
+
+        logging.info('Bye! shutting down now as time has elapsed')
+
+        # Now turn off the system after 1 min
+        
+        os.system("sudo shutdown -P +1")
+        logging.shutdown()
+
+    atexit.register(exit_handler)
