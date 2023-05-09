@@ -58,9 +58,13 @@ def get_last_uploaded(upload_tracker: str) -> float:
         return 0
 
 # get list of files to be uploaded
-def get_files_to_upload(images_folder: str) -> list:
+def get_files_to_upload(images_folder: str, last_uploaded_time: float) -> list:
+    # Get a list of all images in the images_folder
     files = list(filter(os.path.isfile, glob.glob(f"{images_folder}/*.jpg")))
+    # Sort them by time last modified
     files.sort(key=os.path.getmtime)
+    # Filter them by whether they were created later than last_uploaded_time
+    # only add them to the list if they are newer than the last uploaded file
     return list(filter(lambda x: os.path.getmtime(x) > last_uploaded_time, files))
 
 # Function that checks if the rtc was reset (so lost power)
@@ -139,7 +143,7 @@ if __name__ == "__main__":
     if connect() == True:
         last_uploaded_time = get_last_uploaded(upload_tracker)
 
-        files = get_files_to_upload(img_folder)
+        files = get_files_to_upload(img_folder, last_uploaded_time)
         files_to_upload_str = ", ".join(files)
 
         print(f"Internet is connected! Files to be uploaded: {files_to_upload_str}.")
