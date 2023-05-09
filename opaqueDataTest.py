@@ -50,8 +50,12 @@ def set_last_uploaded(upload_tracker: str, last_file: str):
 
 # get last uploaded file
 def get_last_uploaded(upload_tracker: str) -> float:
-    with open(upload_tracker, "r") as f:
-        return os.path.getmtime(f.readline())
+    try:
+        with open(upload_tracker, "r") as f:
+            return os.path.getmtime(f.readline())
+    except Exception as e:
+        logging.info("No upload tracker file found, possibly corrupt. Resync everything.")
+        return 0
 
 # get list of files to be uploaded
 def get_files_to_upload(images_folder: str) -> list:
