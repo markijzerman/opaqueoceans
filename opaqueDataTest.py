@@ -37,7 +37,7 @@ def checkForUser():
 # called when program exits
 def exit_handler():
     # Make sure wakeup_enabled and wakeup_on_charge have the correct values
-    pj.rtcAlarm.SetAlarm({'minute_period': 60})
+    pj.rtcAlarm.SetAlarm({'minute_period': 6})
     pj.rtcAlarm.SetWakeupEnabled(True)
     #pj.power.SetWakeUpOnCharge(0)
     logging.shutdown()
@@ -63,8 +63,16 @@ while pjOK == False:
 # print data for checking
 print(stat['data'])
 
+get_charge = pj.status.GetChargeLevel()
+charge_str = ""
+
+if get_charge['error'] == "NO_ERROR":
+    charge_str = f"Charge level: {get_charge['data']}%"
+else:
+    charge_str = f"Error getting battery charge level: {get_charge['error']}"
+
 # Write statement to log
-logging.info('Hello! Raspberry Pi on battery power. Taking picture!')
+logging.info(f'Hello! Raspberry Pi on battery power. {charge_str}. Taking picture!')
 
 curDate = str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
 os.system("/usr/bin/libcamera-still -o /home/opaque/opaqueoceans/images/image" + curDate + ".jpg")
