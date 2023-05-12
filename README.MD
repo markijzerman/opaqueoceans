@@ -19,7 +19,6 @@ Dolist:
     - added dtoverlay=i2c-rtc,ds1307 to config.txt as explained in  https://github.com/PiSupply/PiJuice/issues/472#issuecomment-594000025
     - helpful voor python pijuice operatie: https://github.com/PiSupply/PiJuice/blob/master/Software/README.md
     - set EEPROM address to 52 as in https://github.com/PiSupply/PiJuice/issues/689
-    - time online sync uitzetten: sudo systemctl disable --now systemd-timesyncd
     - enable "real" hwclock:
         - sudo apt-get remove fake-hwclock
         - sudo update-rc.d -f fake-hwclock remove
@@ -31,6 +30,7 @@ Dolist:
         - as well as: `/sbin/hwclock --rtc=$dev --systz`
     - set timezone to UTC:
         - sudo raspi-config -> localization -> timezone -> none of the above -> UTC
+    - time online sync uitzetten: sudo systemctl disable --now systemd-timesyncd
 
 
 
