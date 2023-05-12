@@ -33,8 +33,49 @@ Dolist:
     - time online sync uitzetten: sudo systemctl disable --now systemd-timesyncd
 
 
+## Config json format
+The config json has the following keys:
+- <b>alarm_config:</b> object; <br>
+Configuration object for the wakeup alarm
+- tbd
+<br>
 
+The alarm_config has the following keys:
+- <b>day_period:</b> int;<br>
+The period in days to wait until the pi wakes up again
+- <b>periodic_photos:</b> bool;<br>
+Whether the alarm config uses periodic hours for wakeup or specific times
+- <b>periodic_config:</b> object;<br>
+The config for periodic wakeup
+- <b>timed_config:</b> array;<br>
+The config for specifically timed wakeup
+<br>
+
+The periodic_config has the following keys:
+- <b>start_time:</b> string;<br>
+The earliest wakeup time/first wakeup time that is set for a new day
+- <b>end_time:</b> string;<br>
+The latest wakeup time/last possible alarm time for a day
+- <b>hm_period</b> string;<br>
+The hour/minute period the alarm should use to set itself with between start_time and end_time
+
+All of these value use "hh:mm" format. The python code splits it on the colon and expects 24h time, no AM or PM
+
+### Example json file
+```
+{
+    "alarm_config" : {
+        "day_period"    : 2,
+        "periodic_photos" : true,
+        "periodic_config" : {
+            "start_time"    : "8:30",
+            "end_time"      : "14:00",
+            "hm_period"     : "2:30"
+        },
+        "timed_config" : ["8:30", "11:30", "12:00"]
+    }
+}
+```
 
 TODO:
-
 
