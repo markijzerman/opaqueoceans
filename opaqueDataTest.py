@@ -20,11 +20,41 @@ import urllib.request
 # for picture date getting 
 from datetime import datetime, timedelta
 
+def getserial():
+  # Extract serial from cpuinfo file
+  cpuserial = "0000000000000000"
+  try:
+    f = open('/proc/cpuinfo','r')
+    for line in f:
+      if line.startswith('Serial'):
+        cpuserial = line.split(":")[1].strip()
+    f.close()
+  except:
+    cpuserial = "ERROR000000000"
+
+  return cpuserial
+
+def get_uuid() -> str:
+    try:
+        serial = getserial()
+
+        with open("config.json") as f:
+            names = json.load(f)
+            if isinstance(names, dict):
+                return names["device_name"][serial]
+            else:
+                logging.warn(f"Failed to get unique name from serial, just using serial.")
+                return serial
+    except:
+        pass
+
 # for checkin internet connection
 def connect(host='http://google.com'):
     try:
-        urllib.request.urlopen(host) #Python 3.x
-        return True
+        if not os.system("curl google.com --fail-early -s -I -o /dev/null"):
+            return True
+        
+        return False
     except:
         return False
     
@@ -190,7 +220,7 @@ def is_rtc_time_sane(pj: PiJuice) -> bool:
 # Can be used to automatically rectify picture names after power loss
 def check_and_sync_rtc(pj: PiJuice) -> bool:
     if not is_rtc_time_sane(pj):
-
+        logging.info("RTC date is before 2023, so it has been off for a while.")
         # enable time server sync
         os.system("sudo systemctl enable --now systemd-timesyncd")
 
@@ -205,7 +235,7 @@ def check_and_sync_rtc(pj: PiJuice) -> bool:
 
         return sync_success
     
-    return False
+    return True
         
 
 if __name__ == "__main__":
@@ -238,13 +268,23 @@ if __name__ == "__main__":
     else:
         charge_str = f"Error getting battery charge level: {get_charge['error']}"
 
+    uuid = get_uuid()
+
     # Write statement to log
     logging.info(f'Hello! Raspberry Pi on battery power. {charge_str}. Taking picture!')
 
     img_folder = "/home/opaque/opaqueoceans/images"
 
+    if not check_and_sync_rtc(pj):
+        # If we turn on with a reset RTC, it is most likely daytime. 
+        # Maybe just use the current time as the alarm time and make an image every day?
+        logging.warn("RTC sync failed. Time is not reliable")
+    else:
+        print(f"Time is synced: current time is {str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))}")
+    
+
     curDate = str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-    new_file_name = f"{img_folder}/image{curDate}.jpg"
+    new_file_name = f"{img_folder}/image{curDate}::{uuid}.jpg"
 
     os.system(f"/usr/bin/libcamera-still -o {new_file_name}")
 
