@@ -45,8 +45,8 @@ def get_uuid() -> str:
             else:
                 logging.warn(f"Failed to get unique name from serial, just using serial.")
                 return serial
-    except:
-        pass
+    except Exception as e:
+        logging.warning(e)
 
 # for checkin internet connection
 def connect(host='http://google.com'):
