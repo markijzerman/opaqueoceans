@@ -1,11 +1,11 @@
 {
     "alarm_config" : {
-        "day_period"    : 2,
+        "day_period"    : 1,
         "periodic_photos" : true,
         "periodic_config" : {
             "start_time"    : "8:30",
-            "end_time"      : "14:00",
-            "hm_period"     : "2:30"
+            "end_time"      : "14:35",
+            "hm_period"     : "2:00"
         },
         "timed_config" : ["8:30", "11:30", "12:00"]
     },
