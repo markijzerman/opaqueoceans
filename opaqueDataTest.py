@@ -11,14 +11,59 @@ import typing as tp
 import glob
 import json
 
-# VALUES
-time = 20
-
-# for internet connection check
-import urllib.request
 
 # for picture date getting 
 from datetime import datetime, timedelta
+
+def absolute_path(filename: str) -> str:
+    return "/home/opaque/opaqueoceans/" + filename
+
+# VALUES
+time = 20
+
+class value:
+    def __init__(self, initial_value = None):
+        self.value = initial_value
+        self.updated = False
+    
+    def set(self, value: tp.Any):
+        self.value = value
+        self.updated = True
+    
+    def get(self) -> tp.Any:
+        return self.value
+    
+    def was_changed(self) -> bool:
+        return self.updated
+
+class state_update_tracker:
+    def __init__(self):
+        with open(absolute_path("state.json"), "r") as f:
+            self.state_json = json.load(f)
+
+            self.values = {"last_uploaded" : value(self.state_json["last_uploaded"]), 
+                           "last_state" : value(self.state_json["rtc_fail_state"]["last_state"]),
+                           "count" : value(self.state_json["rtc_fail_state"]["count"]),
+                           "date" : value(self.state_json["rtc_fail_state"]["count"])}
+            
+    def set(self, key: str, value):
+        try:
+            self.values[key].set(value)
+        except Exception as e:
+            logging.warning(f"Error while setting value {key}: {e}")
+    
+    def get(self, key: str):
+        try:
+            return self.values[key].get()
+        except Exception as e:
+            logging.warning(f"Error while getting value {key}: {e}")
+
+    def was_changed(self, key: str):
+        try:
+            return self.values[key].was_changed()
+        except Exception as e:
+            logging.warning(f"Error while getting was_changed for {key}: {e}")
+
 
 def getserial():
   # Extract serial from cpuinfo file
@@ -38,7 +83,7 @@ def get_uuid() -> str:
     try:
         serial = getserial()
 
-        with open("config.json") as f:
+        with open(absolute_path("config.json")) as f:
             names = json.load(f)
             if isinstance(names, dict):
                 return names["device_name"][serial]
@@ -70,7 +115,7 @@ def checkForUser():
         return False
 
 def get_alarm_config() -> dict:
-    config_path = "/home/opaque/opaqueoceans/config.json"
+    config_path = absolute_path("config.json")
     if os.path.exists(config_path):
         with open(config_path, "r") as f:
             try:
@@ -185,10 +230,6 @@ def exit_handler():
     #pj.power.SetWakeUpOnCharge(0)
     logging.shutdown()
 
-def set_last_uploaded(upload_tracker: str, last_file: str):
-    with open(upload_tracker, "w") as f:
-        f.write(last_file)
-
 # get last uploaded file
 def get_last_uploaded(upload_tracker: str) -> float:
     try:
@@ -199,14 +240,14 @@ def get_last_uploaded(upload_tracker: str) -> float:
         return 0
 
 # get list of files to be uploaded
-def get_files_to_upload(images_folder: str, last_uploaded_time: float) -> list:
+def get_files_to_upload(images_folder: str, last_uploaded_file: str) -> list:
     # Get a list of all images in the images_folder
     files = list(filter(os.path.isfile, glob.glob(f"{images_folder}/*.jpg")))
-    # Sort them by time last modified
-    files.sort(key=os.path.getmtime)
-    # Filter them by whether they were created later than last_uploaded_time
-    # only add them to the list if they are newer than the last uploaded file
-    return list(filter(lambda x: os.path.getmtime(x) > last_uploaded_time, files))
+    # Sort them by name
+    files.sort()
+    last_idx = files.index(last_uploaded_file)
+
+    return files[last_idx+1::]
 
 # Function that checks if the rtc was reset (so lost power)
 def is_rtc_time_sane(pj: PiJuice) -> bool:
@@ -218,24 +259,55 @@ def is_rtc_time_sane(pj: PiJuice) -> bool:
 
 # Function that checks rtc reset and syncs time from ntp server
 # Can be used to automatically rectify picture names after power loss
-def check_and_sync_rtc(pj: PiJuice) -> bool:
-    if not is_rtc_time_sane(pj):
-        logging.info("RTC date is before 2023, so it has been off for a while.")
-        # enable time server sync
-        os.system("sudo systemctl enable --now systemd-timesyncd")
+def sync_rtc(pj: PiJuice) -> bool:
+    logging.info("RTC date is before 2023, so it has been off for a while.")
+    # enable time server sync
+    os.system("sudo systemctl enable --now systemd-timesyncd")
 
-        sync_success = False
-        for i in range(10):
-            res = subprocess.check_output(["timedatectl", "status"])
-            if b'System clock synchronized: yes' in res:
-                sync_success = True
-        
-        # disable time server sync
-        os.system("sudo systemctl disable --now systemd-timesyncd")
-
-        return sync_success
+    sync_success = False
+    for i in range(10):
+        res = subprocess.check_output(["timedatectl", "status"])
+        if b'System clock synchronized: yes' in res:
+            sync_success = True
     
-    return True
+    # disable time server sync
+    os.system("sudo systemctl disable --now systemd-timesyncd")
+
+    return sync_success
+
+def check_and_sync_rtc_state(pj: PiJuice) -> str:
+    rtc_was_reset: bool = not is_rtc_time_sane(pj)
+    rtc_synced = True
+
+    if rtc_was_reset:
+        rtc_synced = sync_rtc(pj)
+
+    return "SYNCED" if rtc_synced else "UNSYNCED"
+
+def get_date_and_count_from_state(state: state_update_tracker) -> str:
+    return state.get("date") + "-" + str(state.get("count"))
+
+# Keeping track of what changed like this is very redundant
+def update_state(state: state_update_tracker):
+    with open(absolute_path("state.json"), "w") as f:
+        if state.was_changed("last_uploaded"):
+            state.state_json["last_uploaded"] = state.get("last_uploaded")
+        
+        if state.was_changed("last_state"):
+            state.state_json["rtc_fail_state"]["last_state"] = state.get("last_state")
+        
+        # kinda hacky, only leave count as is when we are unsynced, otherwise always set to 0
+        if not state.was_changed("count"):
+            state.state_json["rtc_fail_state"]["count"] = state.get("count") + 1
+        else:
+            state.state_json["rtc_fail_state"]["count"] = state.get("count")
+
+        if state.was_changed("date"):
+            state.state_json["rtc_fail_state"]["date"] = state.get("date")
+        
+        json.dump(state.state_json, f, indent=4, sort_keys=True)
+
+    
         
 
 if __name__ == "__main__":
@@ -269,32 +341,43 @@ if __name__ == "__main__":
         charge_str = f"Error getting battery charge level: {get_charge['error']}"
 
     uuid = get_uuid()
+    state_tracker = state_update_tracker()
 
     # Write statement to log
     logging.info(f'Hello! Raspberry Pi on battery power. {charge_str}. Taking picture!')
 
     img_folder = "/home/opaque/opaqueoceans/images"
 
-    if not check_and_sync_rtc(pj):
+    # don't think I need to declare this variable first but it feels wrong not to
+    name_date = ""
+
+    rtc_state = check_and_sync_rtc_state(pj)
+    if  rtc_state == "UNSYNCED":
         # If we turn on with a reset RTC, it is most likely daytime. 
         # Maybe just use the current time as the alarm time and make an image every day?
-        logging.warn("RTC sync failed. Time is not reliable")
+        logging.warn("RTC sync failed. Time is not reliable. Using last known good time and count")
+        name_date = get_date_and_count_from_state()
+        
+        # This is the first round where we're unsynced
+        if state_tracker.get("last_state") == "SYNCED":
+            state_tracker.set("last_state","UNSYNCED")
+            state_tracker.set("count", 0)
     else:
         print(f"Time is synced: current time is {str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))}")
+        name_date = str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
+        state_tracker.set("date", name_date)
+        state_tracker.set("count", 0)
+        state_tracker.set("last_state", "SYNCED")
     
-
-    curDate = str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-    new_file_name = f"{img_folder}/image{curDate}::{uuid}.jpg"
+    new_file_name = f"{img_folder}/image{name_date}::{uuid}.jpg"
 
     os.system(f"/usr/bin/libcamera-still -o {new_file_name}")
 
-    upload_tracker = f"{img_folder}/last_uploaded"
-
     # if internet, upload image
     if connect() == True:
-        last_uploaded_time = get_last_uploaded(upload_tracker)
+        last_uploaded = state_tracker.get("last_uploaded")
 
-        files = get_files_to_upload(img_folder, last_uploaded_time)
+        files = get_files_to_upload(img_folder, last_uploaded)
         files_to_upload_str = ", ".join(files)
 
         print(f"Internet is connected! Files to be uploaded: {files_to_upload_str}.")
@@ -316,10 +399,12 @@ if __name__ == "__main__":
                 break
         
         if last_file != "":
-            set_last_uploaded(upload_tracker, last_file)
+            state_tracker.set("last_uploaded", last_file)
 
     else:
         print('no internet, uploading later')
+
+    update_state(state_tracker)
 
     # check if there is a user logged on, if so stay on, if not, turn off
     # Keep Raspberry Pi running - THING TO DO WOULD BE HERE, WOULD TURN OFF AFTER THIS!
