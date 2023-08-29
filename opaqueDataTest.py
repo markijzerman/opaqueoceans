@@ -4,6 +4,7 @@ import subprocess, os
 import atexit
 import logging
 from time import sleep
+from pijuice import PiJuice
 
 import typing as tp
 
