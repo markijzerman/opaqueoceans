@@ -4,7 +4,6 @@ import subprocess, os
 import atexit
 import logging
 from time import sleep
-from pijuice import PiJuice
 
 import typing as tp
 
@@ -38,13 +37,55 @@ class value:
 
 class state_update_tracker:
     def __init__(self):
-        with open(absolute_path("state.json"), "r") as f:
-            self.state_json = json.load(f)
+        do_reset = not self.init_from_file()
 
-            self.values = {"last_uploaded" : value(self.state_json["last_uploaded"]), 
-                           "last_state" : value(self.state_json["rtc_fail_state"]["last_state"]),
-                           "count" : value(self.state_json["rtc_fail_state"]["count"]),
-                           "date" : value(self.state_json["rtc_fail_state"]["count"])}
+        if do_reset:
+            self.reset()
+            
+    def init_from_file(self):
+        # if state json doesn't exist, create a fresh one
+        if os.path.isfile(absolute_path("state.json")):
+            with open(absolute_path("state.json"), "r") as f:
+                try:
+                    self.state_json = json.load(f)
+                    if not self.validate(self.state_json):
+                        return False
+                except:
+                    # if state json is corrupt, also create a fresh one
+                    return False
+
+                self.values = { "last_uploaded" : value(self.state_json["last_uploaded"]), 
+                                "last_state" : value(self.state_json["rtc_fail_state"]["last_state"]),
+                                "count" : value(self.state_json["rtc_fail_state"]["count"]),
+                                "date" : value(self.state_json["rtc_fail_state"]["count"])}
+                return True
+        
+        return False
+        
+    def reset(self):
+        self.state_json = {
+                    'last_uploaded' : '',
+                    'rtc_fail_state' : {
+                        'last_state' : 'UNSYNCED',
+                        'count' : 0,
+                        'date' : ''
+                    }
+                }
+        self.values = {"last_uploaded" : value("None"), 
+                        "last_state" : value("UNSYNCED"),
+                        "count" : value(0),
+                        "date" : value("")}
+    
+    def validate(self, state_json: dict):
+        ks = state_json.keys()
+        if "last_uploaded" in ks and "rtc_fail_state" in ks:
+            rtc_ks = state_json["rtc_fail_state"].keys()
+
+            if "last_state" in rtc_ks and "count" in rtc_ks and "date" in rtc_ks:
+                return True
+        
+        return False
+
             
     def set(self, key: str, value):
         try:
@@ -230,22 +271,19 @@ def exit_handler():
     #pj.power.SetWakeUpOnCharge(0)
     logging.shutdown()
 
-# get last uploaded file
-def get_last_uploaded(upload_tracker: str) -> float:
-    try:
-        with open(upload_tracker, "r") as f:
-            return os.path.getmtime(f.readline())
-    except Exception as e:
-        logging.info("No upload tracker file found, possibly corrupt. Resync everything.")
-        return 0
-
 # get list of files to be uploaded
 def get_files_to_upload(images_folder: str, last_uploaded_file: str) -> list:
     # Get a list of all images in the images_folder
     files = list(filter(os.path.isfile, glob.glob(f"{images_folder}/*.jpg")))
     # Sort them by name
     files.sort()
-    last_idx = files.index(last_uploaded_file)
+    try:
+        last_idx = files.index(last_uploaded_file)
+    except ValueError as e:
+        logging.warning("Last uploaded file does not exist in folder. Resyncing all files (if any are present).")
+        if len(files) < 1:
+            return []
+        return files
 
     return files[last_idx+1::]
 
@@ -373,11 +411,12 @@ if __name__ == "__main__":
 
     os.system(f"/usr/bin/libcamera-still -o {new_file_name}")
 
-    # if internet, upload image
-    if connect() == True:
-        last_uploaded = state_tracker.get("last_uploaded")
 
-        files = get_files_to_upload(img_folder, last_uploaded)
+    last_uploaded = state_tracker.get("last_uploaded")
+    files = get_files_to_upload(img_folder, last_uploaded)
+
+    # if internet, upload image
+    if connect() and len(files) > 0:
         files_to_upload_str = ", ".join(files)
 
         print(f"Internet is connected! Files to be uploaded: {files_to_upload_str}.")
@@ -402,18 +441,18 @@ if __name__ == "__main__":
             state_tracker.set("last_uploaded", last_file)
 
     else:
-        print('no internet, uploading later')
+        print('no internet or no files, uploading later')
 
     update_state(state_tracker)
 
     # check if there is a user logged on, if so stay on, if not, turn off
     # Keep Raspberry Pi running - THING TO DO WOULD BE HERE, WOULD TURN OFF AFTER THIS!
-    if checkForUser() == False:
+    if not checkForUser():
         sleep(time)
         
         # Make sure wakeup_enabled and wakeup_on_charge have the correct values
         pj.rtcAlarm.SetWakeupEnabled(True)
-    #pj.power.SetWakeUpOnCharge(0)
+        #pj.power.SetWakeUpOnCharge(0)
 
         # Make sure power to the Raspberry Pi is stopped to not deplete
         # the battery
